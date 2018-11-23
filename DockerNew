@@ -1,0 +1,74 @@
+# add 7z tar and zip archivers
+FROM ubuntu:xenial
+
+# https://docs.docker.com/engine/examples/running_ssh_service/
+RUN apt-get update && apt-get install -y openssh-server
+RUN mkdir /var/run/sshd
+RUN echo 'root:shoulder_of_orion_42' | chpasswd
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+RUN mkdir ~/.ssh/
+RUN touch ~/.ssh/authorized_keys
+
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+ENV NOTVISIBLE "in users profile"
+RUN echo "export VISIBLE=now" >> /etc/profile
+
+ENV CONDA_DIR /opt/conda
+ENV PATH $CONDA_DIR/bin:$PATH
+
+# writing env variables to /etc/profile as mentioned here https://docs.docker.com/engine/examples/running_ssh_service/#run-a-test_sshd-container
+RUN echo "export CONDA_DIR=/opt/conda" >> /etc/profile
+RUN echo "export PATH=$CONDA_DIR/bin:$PATH" >> /etc/profile
+
+RUN apt-get install -y bzip2
+RUN mkdir -p $CONDA_DIR && \
+    echo export PATH=$CONDA_DIR/bin:'$PATH' > /etc/profile.d/conda.sh && \
+    apt-get update && \
+    apt-get install -y wget git libhdf5-dev g++ graphviz openmpi-bin nano && \
+    wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    /bin/bash /Miniconda3-latest-Linux-x86_64.sh -f -b -p $CONDA_DIR && \
+    rm Miniconda3-latest-Linux-x86_64.sh
+
+ENV NB_USER keras
+ENV NB_UID 1000
+
+RUN echo "export NB_USER=keras" >> /etc/profile
+RUN echo "export NB_UID=1000" >> /etc/profile
+
+
+RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
+    mkdir -p $CONDA_DIR && \
+    chown keras $CONDA_DIR -R
+
+USER keras
+
+# Python
+ARG python_version=3.7
+#ENV PATH /home/keras/.local/bin:$PATH
+
+RUN conda install -y python=${python_version} && \
+    pip install --upgrade pip && \
+    conda install notebook=5.6 numpy && \
+    conda install bcolz && \
+    pip install scipy numba && \
+    pip install pyglet shapely rtree && \
+    conda install -c conda-forge trimesh && \
+    conda clean -yt
+RUN pip install git+https://github.com/ipython-contrib/jupyter_contrib_nbextensions && \
+    jupyter contrib nbextension install --user
+
+RUN jupyter nbextension enable collapsible_headings/main
+RUN jupyter nbextension enable execute_time/ExecuteTime
+RUN jupyter nbextension enable toc2/main
+
+USER keras
+
+WORKDIR /home/keras/notebook
+
+EXPOSE 8888 22
+
+CMD jupyter notebook --port=8888 --ip=0.0.0.0 --no-browser
+
