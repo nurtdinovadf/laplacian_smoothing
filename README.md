@@ -12,7 +12,7 @@ sudo docker build -f DockerNew . -t lpl_smth
 ```
 1. Run a container with
 ```
-sudo docker run -it -v /path/into/repo/:/home/keras/notebook/ --name mtest_case -p 8888:8888 masters
+sudo docker run -it -v /path/into/repo/:/home/keras/notebook/ --name test_case -p 8888:8888 lpl_smth
 ```
 1. Copy URL from your terminal into your browser. Should be something like:
 ```
